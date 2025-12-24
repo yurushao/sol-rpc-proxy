@@ -1,26 +1,19 @@
+use std::{collections::HashMap, fs, net::SocketAddr, sync::Arc};
+
 use axum::{
     body::{to_bytes, Body},
-    extract::{Query, State},
+    extract::{ConnectInfo, Query, State},
     http::{Request, StatusCode, Uri},
-    response::IntoResponse,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::post,
     Router,
 };
-use axum::{
-    extract::ConnectInfo,
-    middleware::{self, Next},
-    response::Response,
-};
 use clap::Parser;
 use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::client::legacy::Client;
+use hyper_util::client::legacy::{connect::HttpConnector, Client};
 use rand::Rng;
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::fs;
-use std::net::SocketAddr;
-use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber;
 
