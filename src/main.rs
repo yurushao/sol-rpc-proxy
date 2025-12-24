@@ -53,6 +53,7 @@ struct Config {
 
 #[derive(Debug, Deserialize, Clone)]
 struct Backend {
+    label: String,
     url: String,
     #[serde(default = "default_weight")]
     weight: u32,
@@ -69,15 +70,18 @@ struct AppState {
     total_weight: u32,
     api_keys: Vec<String>,
     method_routes: HashMap<String, String>,
+    label_to_url: HashMap<String, String>,
 }
 
 impl AppState {
-    fn select_backend(&self, rpc_method: Option<&str>) -> &str {
+    fn select_backend(&self, rpc_method: Option<&str>) -> (&str, &str) {
         // Check method-specific routing first
         if let Some(method) = rpc_method {
-            if let Some(backend_url) = self.method_routes.get(method) {
-                info!("Method {} routed to {}", method, backend_url);
-                return backend_url;
+            if let Some(backend_label) = self.method_routes.get(method) {
+                if let Some(backend_url) = self.label_to_url.get(backend_label) {
+                    info!("Method {} routed to label={}", method, backend_label);
+                    return (backend_label, backend_url);
+                }
             }
         }
 
@@ -87,13 +91,13 @@ impl AppState {
 
         for backend in &self.backends {
             if random_weight < backend.weight {
-                return &backend.url;
+                return (&backend.label, &backend.url);
             }
             random_weight -= backend.weight;
         }
 
         // Fallback (should never reach here if weights are valid)
-        &self.backends[0].url
+        (&self.backends[0].label, &self.backends[0].url)
     }
 }
 
@@ -119,9 +123,36 @@ fn load_config(config_path: &str) -> Result<Config, Box<dyn std::error::Error>> 
     if config.backends.is_empty() {
         return Err("At least one backend must be configured".into());
     }
+
+    // Create a set of valid backend labels for validation
+    let backend_labels: HashMap<String, String> = config
+        .backends
+        .iter()
+        .map(|b| (b.label.clone(), b.url.clone()))
+        .collect();
+
+    // Check for duplicate labels
+    if backend_labels.len() != config.backends.len() {
+        return Err("Duplicate backend labels found in configuration".into());
+    }
+
     for backend in &config.backends {
         if backend.weight == 0 {
-            return Err(format!("Backend {} has invalid weight 0", backend.url).into());
+            return Err(format!("Backend '{}' has invalid weight 0", backend.label).into());
+        }
+        if backend.label.is_empty() {
+            return Err(format!("Backend with URL '{}' has empty label", backend.url).into());
+        }
+    }
+
+    // Validate method_routes reference valid backend labels
+    for (method, label) in &config.method_routes {
+        if !backend_labels.contains_key(label) {
+            return Err(format!(
+                "Method route '{}' references unknown backend label '{}'",
+                method, label
+            )
+            .into());
         }
     }
 
@@ -208,7 +239,7 @@ async fn proxy(
     let rpc_method = req.extensions().get::<RpcMethod>().map(|m| m.0.as_str());
 
     // Select backend based on method routing or weighted random
-    let backend_url = state.select_backend(rpc_method);
+    let (backend_label, backend_url) = state.select_backend(rpc_method);
 
     // Rebuild URI (remove ?api-key=... from request)
     let request_path_and_query = req
@@ -252,9 +283,9 @@ async fn proxy(
     // Forward request
     match state.client.request(req).await {
         Ok(mut resp) => {
-            // Store selected backend in response extensions for logging
+            // Store selected backend label in response extensions for logging
             resp.extensions_mut()
-                .insert(SelectedBackend(backend_url.to_string()));
+                .insert(SelectedBackend(backend_label.to_string()));
             resp.into_response()
         }
         Err(err) => {
@@ -277,17 +308,27 @@ async fn main() {
     info!("Loaded configuration from: {}", args.config);
     info!("Loaded {} backends", config.backends.len());
     for backend in &config.backends {
-        info!("  - {} (weight: {})", backend.url, backend.weight);
+        info!(
+            "  - [{}] {} (weight: {})",
+            backend.label, backend.url, backend.weight
+        );
     }
 
     if !config.method_routes.is_empty() {
         info!("Method routing overrides:");
-        for (method, url) in &config.method_routes {
-            info!("  - {} -> {}", method, url);
+        for (method, label) in &config.method_routes {
+            info!("  - {} -> {}", method, label);
         }
     }
 
     let total_weight: u32 = config.backends.iter().map(|b| b.weight).sum();
+
+    // Build label-to-URL mapping
+    let label_to_url: HashMap<String, String> = config
+        .backends
+        .iter()
+        .map(|b| (b.label.clone(), b.url.clone()))
+        .collect();
 
     let https = HttpsConnector::new();
     let state = Arc::new(AppState {
@@ -296,6 +337,7 @@ async fn main() {
         total_weight,
         api_keys: config.api_keys,
         method_routes: config.method_routes,
+        label_to_url,
     });
 
     let app = Router::new()

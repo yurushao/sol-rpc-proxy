@@ -1,4 +1,4 @@
-# Example configuration for RPC Proxy
+# Example configuration for RPC Router
 # Copy this file to config.toml and customize
 
 # Server port
@@ -20,14 +20,17 @@ api_keys = ["your-api-key-1", "your-api-key-2", "your-api-key-3"]
 #   - Third backend:  1/6 = 16.7% of requests
 
 [[backends]]
+label = "backend-0"
 url = "https://api.mainnet-beta.solana.com"
 weight = 2
 
 [[backends]]
+label = "backend-1"
 url = "https://some-solana-rpc.com"
 weight = 3
 
 [[backends]]
+label = "backend-2"
 url = "https://another-solana-rpc.com"
 weight = 1
 
@@ -43,7 +46,7 @@ weight = 1
 
 [method_routes]
 # Route transaction submissions to a specific high-performance backend
-# sendTransaction = "https://api.mainnet-beta.solana.com"
+# sendTransaction = "backend-1"
 # 
 # Route account queries to a different backend
-# getAccountInfo = "https://some-solana-rpc.com"
+# getAccountInfo = "backend-2"

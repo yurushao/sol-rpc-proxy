@@ -16,11 +16,13 @@ The router uses a TOML configuration file specified via command-line argument.
 ### TOML Configuration
 
 1. Copy the example configuration:
+
    ```bash
    cp config.example.toml config.toml
    ```
 
 2. Edit `config.toml` with your settings:
+
    ```toml
    # Server port
    port = 28899
@@ -30,21 +32,26 @@ The router uses a TOML configuration file specified via command-line argument.
 
    # Backend RPC endpoints with weights
    [[backends]]
+   label = "backend-0"
    url = "https://api.mainnet-beta.solana.com"
    weight = 2
 
    [[backends]]
+   label = "backend-1"
    url = "https://solana-api.com"
    weight = 1
 
    # Method-specific routing overrides (optional)
+   # Use backend labels to route specific methods
    [method_routes]
-   getProgramAccountsV2 = "https://mainnet.helius-rpc.com/?api-key=<helius-api-key>"
+   getProgramAccountsV2 = "backend-0"
+   sendTransaction = "backend-1"
    ```
 
 ### Weighted Load Balancing
 
 Backends are selected randomly based on their configured weights:
+
 - **Weight 2**: Gets 2x more requests than weight 1
 - **Weight 3**: Gets 3x more requests than weight 1
 - **Example**: Weights [2, 3, 1] result in distribution [33.3%, 50%, 16.7%]
@@ -52,7 +59,9 @@ Backends are selected randomly based on their configured weights:
 ### Method-Based Routing
 
 Override the weighted selection for specific RPC methods:
-- Define method → backend mappings in `[method_routes]`
+
+- Define method → backend label mappings in `[method_routes]`
+- Use backend labels to reference backends
 - **Method names are case-sensitive** - must match exactly what's in the JSON-RPC `"method"` field
 - Useful for routing expensive operations to specific providers
 
@@ -61,11 +70,13 @@ Override the weighted selection for specific RPC methods:
 1. Configure the router (see Configuration section above)
 
 2. Run the router with default config file (`config.toml`):
+
    ```bash
    cargo run --release
    ```
 
 3. Or specify a custom config file:
+
    ```bash
    cargo run --release -- --config /path/to/custom-config.toml
    # or short form:
@@ -73,6 +84,7 @@ Override the weighted selection for specific RPC methods:
    ```
 
 4. Make requests with your API key:
+
    ```bash
    curl -X POST -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","id":1,"method":"getEpochInfo"}' \
