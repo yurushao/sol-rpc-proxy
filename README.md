@@ -1,6 +1,6 @@
-# RPC Proxy
+# RPC Router
 
-A high-performance HTTP proxy for RPC requests with API key authentication, weighted load balancing, and method-based routing.
+A high-performance HTTP router for Solana RPC requests with API key authentication, weighted load balancing, and method-based routing.
 
 ## Features
 
@@ -11,7 +11,7 @@ A high-performance HTTP proxy for RPC requests with API key authentication, weig
 
 ## Configuration
 
-The proxy uses a TOML configuration file specified via command-line argument.
+The router uses a TOML configuration file specified via command-line argument.
 
 ### TOML Configuration
 
@@ -58,9 +58,9 @@ Override the weighted selection for specific RPC methods:
 
 ## Usage
 
-1. Configure the proxy (see Configuration section above)
+1. Configure the router (see Configuration section above)
 
-2. Run the proxy with default config file (`config.toml`):
+2. Run the router with default config file (`config.toml`):
    ```bash
    cargo run --release
    ```
