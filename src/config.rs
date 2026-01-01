@@ -11,6 +11,20 @@ pub struct Config {
     pub method_routes: HashMap<String, String>,
     #[serde(default)]
     pub health_check: HealthCheckConfig,
+    #[serde(default)]
+    pub proxy: ProxyConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
+pub struct ProxyConfig {
+    pub timeout_secs: u64,
+}
+
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        Self { timeout_secs: 30 }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -78,6 +92,10 @@ pub fn load_config(config_path: &str) -> Result<Config, Box<dyn std::error::Erro
         if backend.label.is_empty() {
             return Err(format!("Backend with URL '{}' has empty label", backend.url).into());
         }
+    }
+
+    if config.proxy.timeout_secs == 0 {
+        return Err("Proxy timeout_secs must be > 0".into());
     }
 
     // Validate method_routes reference valid backend labels

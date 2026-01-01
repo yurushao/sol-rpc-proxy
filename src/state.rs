@@ -16,6 +16,7 @@ pub struct AppState {
     pub method_routes: HashMap<String, String>,
     pub label_to_url: HashMap<String, String>,
     pub health_state: Arc<HealthState>,
+    pub proxy_timeout_secs: u64,
 }
 
 impl AppState {

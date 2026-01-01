@@ -76,6 +76,7 @@ async fn main() {
         method_routes: config.method_routes,
         label_to_url,
         health_state: health_state.clone(),
+        proxy_timeout_secs: config.proxy.timeout_secs,
     });
 
     // Spawn background health check task

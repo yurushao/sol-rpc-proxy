@@ -9,6 +9,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use tokio::time::{timeout, Duration};
 use tracing::info;
 
 use crate::state::AppState;
@@ -159,17 +160,31 @@ pub async fn proxy(
     *req.uri_mut() = parsed_uri;
 
     // Forward request
-    match state.client.request(req).await {
-        Ok(mut resp) => {
+    let result = timeout(
+        Duration::from_secs(state.proxy_timeout_secs),
+        state.client.request(req),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(mut resp)) => {
             // Store selected backend label in response extensions for logging
             resp.extensions_mut()
                 .insert(SelectedBackend(backend_label.to_string()));
             resp.into_response()
         }
-        Err(err) => {
+        Ok(Err(err)) => {
             info!("Backend request failed: {} (error type: {:?})", err, err);
             (StatusCode::BAD_GATEWAY, format!("Proxy error: {}", err)).into_response()
         }
+        Err(_) => (
+            StatusCode::GATEWAY_TIMEOUT,
+            format!(
+                "Upstream request timed out after {}s",
+                state.proxy_timeout_secs
+            ),
+        )
+            .into_response(),
     }
 }
 
